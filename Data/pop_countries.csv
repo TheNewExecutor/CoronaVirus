@@ -13,7 +13,7 @@
 11,Argentina,45479118.0
 12,Austria,8859449.0
 13,Australia,25466459.0
-14,"Bahamas, The",337721.0
+14,Bahamas,337721.0
 15,Bahrain,1505003.0
 16,Bangladesh,162650853.0
 17,Barbados,294560.0
@@ -50,8 +50,8 @@
 48,Cocos (Keeling) Islands,596.0
 49,Comoros,846281.0
 50,Colombia,49084841.0
-51,"Congo, Republic of the",5293070.0
-52,"Congo, Democratic Republic of the",101780263.0
+51,Congo (Brazzaville),5293070.0
+52,Congo (Kinshasa),101780263.0
 53,Cook Islands,8574.0
 54,Coral Sea Islands,0.0
 55,Costa Rica,5097988.0
@@ -81,7 +81,7 @@
 79,French Polynesia,295121.0
 80,France,67848156.0
 81,Gabon,2230908.0
-82,"Gambia, The",2173999.0
+82,Gambia,2173999.0
 83,Ghana,29340248.0
 84,Germany,80159662.0
 85,Georgia,3997000.0
@@ -98,7 +98,7 @@
 96,Guyana,750204.0
 97,Haiti,11067777.0
 98,Heard Island and McDonald Islands,0.0
-99,Holy See (Vatican City),1000.0
+99,Holy See,1000.0
 100,Honduras,9235340.0
 101,Hong Kong,7249907.0
 102,Hungary,9771827.0
@@ -216,7 +216,7 @@
 214,Suriname,609569.0
 215,Sweden,10202491.0
 216,Switzerland,8403994.0
-217,Taiwan,23603049.0
+217,Taiwan*,23603049.0
 218,Syria,19398448.0
 219,Tajikistan,8873669.0
 220,Tanzania,58552845.0
@@ -241,12 +241,12 @@
 239,Wallis and Futuna,15854.0
 240,Uruguay,3387605.0
 241,Wake Island,0.0
-242,West Bank,2900034.0
+242,West Bank and Gaza,2900034.0
 243,Uzbekistan,30565411.0
 244,United Kingdom,65761117.0
 245,Western Sahara,652271.0
 246,Zambia,17426623.0
-247,United States,332639102.0
+247,US,332639102.0
 248,Yemen,29884405.0
 249,Zimbabwe,14546314.0
 250,The Diamond Princess,3711.0

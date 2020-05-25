@@ -1,20 +1,22 @@
 import dash
-import dash_table
 import dash_core_components as dcc
 import dash_html_components as html
-import plotly.graph_objs as go
-from dash.dependencies import State, Input, Output
+from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 import plotly.express as px
 import pandas as pd
 from helper_functions import create_per_capita_features, load_raw_global, load_local, \
-    load_merged_daily_global, load_merged_daily_local, sieve
-from typing import List, Iterable, Tuple
+    load_merged_daily_global, load_merged_daily_local, sieve, load_tidy_global, top_n_locations
+from typing import Iterable
+
+external_stylesheets = ['https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css']
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
 
 # Load all data
-@appcallback()
 def load_data():
     """Load all processed COVID-19 data"""
+
     data = load_raw_global()
     tidy_global = load_tidy_global(data)
     merged_global = load_merged_daily_global(tidy_global)
@@ -29,18 +31,21 @@ def load_data():
     files = ['pop_countries.csv', 'pop_states.csv', 'pop_counties.csv']
     populations = [pd.read_csv('Data/' + file, index_col=0) for file in files]
     world_data, state_data, county_data = [create_per_capita_features(data, pop)
-                                   for data, pop in zip(datasets, populations)]
+                                           for data, pop in zip(datasets, populations)]
     world_data['Location'] = world_data['Country/Region']
     state_data['Location'] = state_data['State']
     county_data['Location'] = county_data['County'] + ', ' + county_data['State']
-    world_data.loc[world_data.Location=='Georgia'].Location = 'Georgia (country)'
+    world_data.loc[world_data.Location == 'Georgia', 'Location'] = 'Georgia (country)'
     return world_data, state_data, county_data
 
 
 world_data, state_data, county_data = load_data()
+top10_countries = top_n_locations(world_data, feature='Confirmed')
 
-def create_plot(content: str='Confirmed', countries :List[str], states: List[str]=[], counties: List[Tuple[str]]=[],
-                log_y: bool=False, per_capita: bool=False):
+
+def create_plot(content: str = 'Confirmed', countries: Iterable = top10_countries,
+                states: Iterable = [], counties: Iterable = [],
+                log_y: str = 'linear', per_capita: str = 'total'):
     """
 
     Parameters
@@ -53,9 +58,9 @@ def create_plot(content: str='Confirmed', countries :List[str], states: List[str
         States to plot
     counties : list of strings
         Counties to plot
-    y_axis : string {'linear', 'log'}
+    log_y : string {'linear', 'log'}
         y axis scale
-    per_capita : string {'yes', 'no'}
+    per_capita : string {'total', 'per capita'}
         Option to normalize data by population
 
     Returns
@@ -63,60 +68,131 @@ def create_plot(content: str='Confirmed', countries :List[str], states: List[str
     fig : object
         The plot output
     """
-    data['countries'] = sieve(world_data, 'Location', countries)
-    data['states'] = sieve(state_data, 'Location',states)
-    data['counties'] = sieve(county_data, 'Location', counties)
-    filtered_data = pd.concat(data.values(), axis=1)
+    data = {'countries': sieve(world_data, 'Location', countries),
+            'states': sieve(state_data, 'Location', states),
+            'counties': sieve(county_data, 'Location', counties)}
+    filtered_data = pd.concat(data.values(), join='inner')
 
-    if per_capita:
+    if per_capita !='total':
         content = ' '.join([content, 'per capita'])
-    fig = px.line(filtered_data, x='Date', y=content, log_y=log_y,
-                      color='Location', hover_name='Location', title=content)
+    y_axis = log_y != 'linear'
+    fig = px.line(filtered_data, x='Date', y=content, log_y=y_axis,
+                  color='Location', hover_name='Location', title=content)
 
     return fig
+
 
 def create_y_radio():
     return dcc.RadioItems(
         options=[
-            {'label': 'log', 'value': True},
-            {'label': 'linear', 'value': False}
-        ]
+            {'label': 'log', 'value': 'log'},
+            {'label': 'linear', 'value': 'linear'}
+        ],
+        value='linear',
+        id='y-axis'
     )
+
 
 def create_content_radio():
     return dcc.RadioItems(
         options=[{'label': val, 'value': val}
-                for val in ['Confirmed', 'Deaths', 'Recovered']]
+                 for val in ['Confirmed', 'Deaths', 'Recovered']],
+        value='Confirmed',
+        labelStyle={'display': 'inline-block'},
+        id='content-radio'
     )
+
 
 def create_per_capita_element():
     return dcc.RadioItems(
-        options=[{'label': 'Total', 'value': False},
-                 {'label': 'per capita', 'value': True}
-                ]
+        options=[{'label': 'Total', 'value': 'total'},
+                 {'label': 'per capita', 'value': 'per capita'}
+                 ],
+        id='per-capita-radio',
+        value='total'
     )
 
-def create_county_select():
-    pass
 
-def create_state_select():
-    pass
+def create_location_select(data, id):
+    return dcc.Dropdown(
+        options=[{'label': location, 'value': location}
+                 for location in data['Location'].unique()],
+        multi=True,
+        id=id
+    )
 
-def create_country_select():
-    pass
+
+app.layout = html.Div(
+    #className='container',
+    children=[
+        html.Div(
+            html.Div([create_content_radio()]),
+            id='row1',
+            className='row-sm-12 text-center',
+        ),
+        html.Div(
+            id='row2',
+            className='four columns card',
+            children=[
+                html.Div(children=[html.H6('Choose y-axis Scaling'),
+                                   create_y_radio()],
+                         className='two columns card'
+                         ),
+                html.Div(
+                    dcc.Graph(
+                        figure=create_plot(),
+                        id='plot1',
+                    ),
+                    className='col-sm-8'
+                ),
+                html.Div(
+                    create_per_capita_element(),
+                    id='per-capita-div',
+                    #className='col-sm-2'
+                )
+            ],
+        ),
+        html.Div(id='row3',
+                 className='row-sm-12',
+                 children=[
+                     html.Div(id='location-container',
+                              children=[
+                                  html.Div(
+                                      id='loc-sel-col1',
+                                      className='col-sm-4 padding-top-bot',
+                                      children=[html.H6('Choose Countries:'),
+                                                create_location_select(world_data, 'countries-multiselect'),
+                                                html.H6('Choose States:'),
+                                                create_location_select(state_data, 'states-multiselect')
+                                      ]
+                                  ),
+
+                                  html.Div(
+                                      id='loc-sel-col3',
+                                      className='col-sm-4',
+                                      children=[html.H6('Choose Counties:'),
+                                                create_location_select(county_data, 'counties-multiselect')]
+                                  )
+                              ])
+                 ]
+        ),
+
+    ]
+)
 
 
-
-@appcallback(
+@app.callback(
     [Output('plot1', 'figure')],
-    [Input('y-axis', 'value'),
-     Input('content-radio', 'value'),
-     Input('per-capita-radio', 'value'),
+    [Input('content-radio', 'value'),
      Input('countries-multiselect', 'value'),
      Input('states-multiselect', 'value'),
-     Input('counties-multiselect', 'value')]
+     Input('counties-multiselect', 'value'),
+     Input('y-axis', 'value'),
+     Input('per-capita-radio', 'value')
+     ]
 )
-def update_plot(content, countries, states, counties, log_y, per_capita):
+def update_plot(content: str, countries: Iterable, states: Iterable, counties: Iterable,
+                log_y: bool, per_capita: bool):
     """
     Update plot based on figure
 
@@ -130,7 +206,7 @@ def update_plot(content, countries, states, counties, log_y, per_capita):
         States to plot
     counties : list of strings
         Counties to plot
-    y_axis : string {'linear', 'log'}
+    log_y : string {'linear', 'log'}
         y axis scale
     per_capita : string {'yes', 'no'}
         Option to normalize data by population
@@ -140,27 +216,11 @@ def update_plot(content, countries, states, counties, log_y, per_capita):
     fig: object
         The plot with updated
     """
-    return create_plot(content, countries, states, counties, log_y, per_capita)
+    try:
+        return create_plot(content, countries, states, counties, log_y, per_capita)
+    except:
+        raise PreventUpdate
 
 
-external_stylesheets = ['https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css']
-
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
-app.layout(html.Div(
-    className='row',
-    children=[
-    html.Div(id='row1',
-             className='row',
-             ),
-    html.Div(id='row2',
-             className='row'),
-    html.Div(id='row3',
-             className='row'),
-    html.Div()
-        ]
-    )
-
-
-
-)
+if __name__ == '__main__':
+    app.run_server(debug=True, port=3004)

@@ -32,8 +32,8 @@ def load_local():
 
 def search_country(data, countries):
     """Narrow search results for confirmed, deaths"""
-    data = data[data['Country/Region'].isin(countries)]
-    return confirmed, deaths
+    sub_data = data[data['Country/Region'].isin(countries)]
+    return sub_data
 
 
 def time_series(data):
@@ -55,6 +55,7 @@ def load_merged_daily_global(datadict):
     merged = d_[0]
     for d in d_:
         merged = pd.merge(merged, d)
+    merged['Date'] = pd.to_datetime(merged.Date)
     for key in ['Confirmed', 'Deaths', 'Recovered']:
         merged['Daily ' + key] = (merged
                                   .groupby('Country/Region')
@@ -81,7 +82,7 @@ def load_merged_daily_local(data):
     group = 'State'
     if iscounty:
         group = ['County', 'State']
-    for i in ['Cases', 'Deaths']:
+    for i in ['Confirmed', 'Deaths']:
         data['Daily ' + i] = data.groupby(group)[i].diff().fillna(data[i])
     return data
 
@@ -108,6 +109,20 @@ def load_daily_county(county):
 
 
 # Functions to filter data
+
+def top_n_locations(data, feature='Confirmed', n=10):
+    """Return list of top n locations wrt feature in descending order"""
+
+    top_n = (data
+             .groupby('Location')
+             .agg('max')
+             .sort_values(feature, ascending=False)
+             .head(n)
+             .index
+             .values)
+    return list(top_n)
+
+
 def top_n_countries(world_confirmed, feature='Confirmed', n=10):
     """Return list of top n countries with highest feature (Confirmed, Deaths, Recovered, Daily ...)"""
     top_n = (world_confirmed
@@ -135,11 +150,15 @@ def top_n_counties(counties, feature='Confirmed', n=10):
     top_n = (counties
              .groupby('County_State')
              .agg['max']
-             .sort_values('Confirmed', ascending=False)
+             .sort_values(feature, ascending=False)
              .head(n)
              .index
              .values)
     return list(top_n)
+
+
+def sieve(data, field, selection):
+    return data[data[field].isin(selection)]
 
 
 def filter_countries(data, countries):
@@ -183,7 +202,7 @@ def convert2num(text):
         factor = dd[unit.group(1)]
         text = text.replace(unit.group(), '').rstrip()
 
-    found = re.search(r'-?\d+[\.]?\d*', text.replace('$', '').replace(',', ''))
+    found = re.search(r'-?\d+[.]?\d*', text.replace('$', '').replace(',', ''))
 
     if found:
         try:
@@ -333,7 +352,7 @@ def translate(text, d):
 def load_population_data():
     """Load and prepare country populations with same keys as covid19 data."""
     # Load population data
-    populations_counties = pd.read_csv('https://www2.census.gov/programs-surveys/popest/datasets/' \
+    populations_counties = pd.read_csv('https://www2.census.gov/programs-surveys/popest/datasets/'
                                        '2010-2019/counties/totals/co-est2019-alldata.csv', encoding='ISO-8859-1')
     populations_states = populations_counties[populations_counties.STNAME == populations_counties.CTYNAME]
     populations_countries = pd.read_csv('countries.csv')

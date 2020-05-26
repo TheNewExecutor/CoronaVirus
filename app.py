@@ -9,6 +9,7 @@ import pandas as pd
 from helper_functions import create_per_capita_features, load_raw_global, load_local, \
     load_merged_daily_global, load_merged_daily_local, sieve, load_tidy_global, top_n_locations
 from typing import Iterable
+import re
 
 external_stylesheets = ['https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -42,7 +43,6 @@ def load_data():
 
 world_data, state_data, county_data = load_data()
 top10_countries = top_n_locations(world_data, feature='Confirmed')
-
 
 
 def create_plot(content: str = 'Confirmed', countries: Iterable = top10_countries,
@@ -97,13 +97,13 @@ def create_top_n():
 
 def create_daily_radio():
     return dcc.RadioItems(
-        options=[ {'label': val, 'value': val}
-                  for val in ['Cumulative', 'Daily']],
+        options=[{'label': val, 'value': val}
+                 for val in ['Cumulative', 'Daily']],
         value='Cumulative',
         id='daily-radio',
         labelStyle={
             "display": "inline-block",
-            "padding": "12px 12px 12px 0px",
+            "padding": "12px 12px 12px 50px",
         }
     )
 
@@ -170,7 +170,7 @@ def create_left_card():
                  [html.H6('Content', className='alert-secondary'),
                   dbc.Row([
                       dbc.Col(create_content_radio()),
-                    dbc.Col(create_daily_radio())]
+                      dbc.Col(create_daily_radio())]
                   ),
                   html.H6('y-Axis Scaling', className='alert-secondary'),
                   create_y_radio(),
@@ -178,9 +178,9 @@ def create_left_card():
                   create_per_capita_element(),
                   html.H6('Choose Countries:', className='alert-secondary'),
                   create_location_select(world_data, 'countries-multiselect', top10_countries),
-                  html.H6('Choose States:', className='alert-secondary'),
+                  html.H6('Choose US States and Territories:', className='alert-secondary'),
                   create_location_select(state_data, 'states-multiselect', []),
-                  html.H6('Choose Counties:', className='alert-secondary'),
+                  html.H6('Choose US Counties:', className='alert-secondary'),
                   create_location_select(county_data, 'counties-multiselect', [])
                   ]
              )
@@ -289,6 +289,64 @@ def update_plot(content: str,
                            )
     except:
         raise PreventUpdate
+
+
+@app.callback(
+    [Output('countries-multiselect', 'options'),
+     Output('states-multiselect', 'options'),
+     Output('counties-multiselect', 'options'),
+     Output('countries-multiselect', 'placeholder'),
+     Output('states-multiselect', 'placeholder'),
+     Output('counties-multiselect', 'placeholder')],
+    [Input('content-radio', 'value'),
+     Input('per-capita-radio', 'value'),
+     Input('daily-radio', 'value')]
+)
+def update_location_options(content: str, per_capita: str, daily: str):
+    """
+    Update sorted options for choose location dropdowns
+
+    Parameters
+    ----------
+    content : " str {'Confirmed', 'Deaths', 'Recovered'}
+        Content option values
+    per_capita : str {'total', 'per capita'}
+        Normalization option values
+    daily : str {'Cumulative', 'Daily'}
+        Difference option values
+
+    Returns
+    -------
+    country_options : list(dicts)
+        New sorted countries options based on input
+    state_options : list(dicts)
+        New sorted states options based on inputs
+    county_options : list(dicts)
+
+    """
+    field = content
+    if per_capita == 'per capita':
+        field = ' '.join([content, per_capita])
+    if daily == 'Daily':
+        field = ' '.join([daily, field])
+    local_field = re.sub(r'Recovered', 'Confirmed', field)
+
+    option_values = {
+        'countries': top_n_locations(world_data, field, 3000),
+        'states': top_n_locations(state_data, local_field, 3000),
+        'counties': top_n_locations(county_data, local_field, 3000)
+    }
+
+    placeholders = {'countries': f'Sorted by {field}',
+                    'states': f'Sorted by {local_field}',
+                    'counties': f'Sorted by {local_field}'}
+    options = {}
+    for level in option_values:
+        options[level] = [{'label': location, 'value': location}
+                          for location in option_values[level]]
+
+    return (options['countries'], options['states'], options['counties'],
+            placeholders['countries'], placeholders['states'], placeholders['counties'])
 
 
 if __name__ == '__main__':

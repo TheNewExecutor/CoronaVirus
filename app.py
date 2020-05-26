@@ -1,5 +1,6 @@
 import dash
 import dash_core_components as dcc
+import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
@@ -43,9 +44,11 @@ world_data, state_data, county_data = load_data()
 top10_countries = top_n_locations(world_data, feature='Confirmed')
 
 
+
 def create_plot(content: str = 'Confirmed', countries: Iterable = top10_countries,
                 states: Iterable = [], counties: Iterable = [],
-                log_y: str = 'linear', per_capita: str = 'total'):
+                log_y: str = 'linear', per_capita: str = 'total',
+                daily: str = 'cumulative'):
     """
 
     Parameters
@@ -62,7 +65,8 @@ def create_plot(content: str = 'Confirmed', countries: Iterable = top10_countrie
         y axis scale
     per_capita : string {'total', 'per capita'}
         Option to normalize data by population
-
+    daily : string {'Cumulative', 'Daily'}
+        Option to show daily difference data or cumulative
     Returns
     -----------
     fig : object
@@ -71,15 +75,37 @@ def create_plot(content: str = 'Confirmed', countries: Iterable = top10_countrie
     data = {'countries': sieve(world_data, 'Location', countries),
             'states': sieve(state_data, 'Location', states),
             'counties': sieve(county_data, 'Location', counties)}
-    filtered_data = pd.concat(data.values(), join='inner')
+    filtered_data = pd.concat(data.values(), join='outer')
 
-    if per_capita !='total':
+    if daily == 'Daily':
+        content = ' '.join([daily, content])
+    if per_capita != 'total':
         content = ' '.join([content, 'per capita'])
+
     y_axis = log_y != 'linear'
     fig = px.line(filtered_data, x='Date', y=content, log_y=y_axis,
                   color='Location', hover_name='Location', title=content)
 
     return fig
+
+
+def create_top_n():
+    return dcc.Dropdown(
+        options=[{'label': 'Top Countries (Deaths)'}]
+    )
+
+
+def create_daily_radio():
+    return dcc.RadioItems(
+        options=[ {'label': val, 'value': val}
+                  for val in ['Cumulative', 'Daily']],
+        value='Cumulative',
+        id='daily-radio',
+        labelStyle={
+            "display": "inline-block",
+            "padding": "12px 12px 12px 0px",
+        }
+    )
 
 
 def create_y_radio():
@@ -89,7 +115,11 @@ def create_y_radio():
             {'label': 'linear', 'value': 'linear'}
         ],
         value='linear',
-        id='y-axis'
+        id='y-axis',
+        labelStyle={
+            "display": "inline-block",
+            "padding": "12px 12px 12px 0px",
+        }
     )
 
 
@@ -98,8 +128,11 @@ def create_content_radio():
         options=[{'label': val, 'value': val}
                  for val in ['Confirmed', 'Deaths', 'Recovered']],
         value='Confirmed',
-        labelStyle={'display': 'inline-block'},
-        id='content-radio'
+        id='content-radio',
+        labelStyle={
+            "display": "inline-block",
+            "padding": "12px 12px 12px 0px",
+        }
     )
 
 
@@ -109,90 +142,117 @@ def create_per_capita_element():
                  {'label': 'per capita', 'value': 'per capita'}
                  ],
         id='per-capita-radio',
-        value='total'
+        value='total',
+        labelStyle={
+            "display": "inline-block",
+            "padding": "12px 12px 12px 0px",
+        }
     )
 
 
-def create_location_select(data, id):
+def create_location_select(data, id, values):
     return dcc.Dropdown(
         options=[{'label': location, 'value': location}
                  for location in data['Location'].unique()],
         multi=True,
-        id=id
+        id=id,
+        value=values
     )
 
 
+def create_left_card():
+    """Panel with plot setting elements"""
+    card = dbc.Card(
+        [dbc.CardBody(
+            [html.H3("Plot Settings", className="alert-secondary"),
+             html.Br(),
+             html.Div(
+                 [html.H6('Content', className='alert-secondary'),
+                  dbc.Row([
+                      dbc.Col(create_content_radio()),
+                    dbc.Col(create_daily_radio())]
+                  ),
+                  html.H6('y-Axis Scaling', className='alert-secondary'),
+                  create_y_radio(),
+                  html.H6('Normalization', className='alert-secondary'),
+                  create_per_capita_element(),
+                  html.H6('Choose Countries:', className='alert-secondary'),
+                  create_location_select(world_data, 'countries-multiselect', top10_countries),
+                  html.H6('Choose States:', className='alert-secondary'),
+                  create_location_select(state_data, 'states-multiselect', []),
+                  html.H6('Choose Counties:', className='alert-secondary'),
+                  create_location_select(county_data, 'counties-multiselect', [])
+                  ]
+             )
+             ]
+
+        ),
+        ]
+    ),
+    return card
+
+
+def create_right_card():
+    """Panel with plot """
+    card = dbc.Card(
+        [
+            dbc.CardBody(
+                [
+                    html.H3("COVID-19 Time Series Comparisons", className="alert-secondary"),
+                    html.Div(
+                        dcc.Graph(figure=create_plot(),
+                                  id='plot1')
+                    )
+
+                ],
+            ),
+        ],
+    )
+    return card
+
+
 app.layout = html.Div(
-    #className='container',
+    className='bg-light',
     children=[
         html.Div(
-            html.Div([create_content_radio()]),
-            id='row1',
-            className='row-sm-12 text-center',
+            [html.H1("COVID-19 Dashboard",
+                     id="title",
+                     className="text-white",
+                     style={"margin-left": "3%"},
+                     ),
+             ],
+            className="jumbotron bg-dark",
         ),
         html.Div(
-            id='row2',
-            className='four columns card',
-            children=[
-                html.Div(children=[html.H6('Choose y-axis Scaling'),
-                                   create_y_radio()],
-                         className='two columns card'
-                         ),
-                html.Div(
-                    dcc.Graph(
-                        figure=create_plot(),
-                        id='plot1',
-                    ),
-                    className='col-sm-8'
-                ),
-                html.Div(
-                    create_per_capita_element(),
-                    id='per-capita-div',
-                    #className='col-sm-2'
-                )
-            ],
-        ),
-        html.Div(id='row3',
-                 className='row-sm-12',
-                 children=[
-                     html.Div(id='location-container',
-                              children=[
-                                  html.Div(
-                                      id='loc-sel-col1',
-                                      className='col-sm-4 padding-top-bot',
-                                      children=[html.H6('Choose Countries:'),
-                                                create_location_select(world_data, 'countries-multiselect'),
-                                                html.H6('Choose States:'),
-                                                create_location_select(state_data, 'states-multiselect')
-                                      ]
-                                  ),
-
-                                  html.Div(
-                                      id='loc-sel-col3',
-                                      className='col-sm-4',
-                                      children=[html.H6('Choose Counties:'),
-                                                create_location_select(county_data, 'counties-multiselect')]
-                                  )
-                              ])
-                 ]
-        ),
-
-    ]
-)
+            dbc.Row(
+                [dbc.Col(create_left_card(), width=4),
+                 dbc.Col(create_right_card(), width=8)
+                 ],
+            )
+        )
+    ])
 
 
 @app.callback(
-    [Output('plot1', 'figure')],
+    Output('plot1', 'figure'),
     [Input('content-radio', 'value'),
      Input('countries-multiselect', 'value'),
      Input('states-multiselect', 'value'),
      Input('counties-multiselect', 'value'),
      Input('y-axis', 'value'),
-     Input('per-capita-radio', 'value')
+     Input('per-capita-radio', 'value'),
+     Input('daily-radio', 'value')
+
      ]
 )
-def update_plot(content: str, countries: Iterable, states: Iterable, counties: Iterable,
-                log_y: bool, per_capita: bool):
+def update_plot(content: str,
+                countries: Iterable,
+                states: Iterable,
+                counties: Iterable,
+                log_y: str,
+                per_capita: str,
+                daily: str
+                ):
     """
     Update plot based on figure
 
@@ -208,8 +268,10 @@ def update_plot(content: str, countries: Iterable, states: Iterable, counties: I
         Counties to plot
     log_y : string {'linear', 'log'}
         y axis scale
-    per_capita : string {'yes', 'no'}
+    per_capita : string {'total', 'per capita'}
         Option to normalize data by population
+    daily : string {'cumulative', 'daily'}
+        Option to check changes
 
     Returns
     -------
@@ -217,7 +279,14 @@ def update_plot(content: str, countries: Iterable, states: Iterable, counties: I
         The plot with updated
     """
     try:
-        return create_plot(content, countries, states, counties, log_y, per_capita)
+        return create_plot(content=content,
+                           countries=countries,
+                           states=states,
+                           counties=counties,
+                           log_y=log_y,
+                           per_capita=per_capita,
+                           daily=daily
+                           )
     except:
         raise PreventUpdate
 

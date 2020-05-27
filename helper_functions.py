@@ -265,8 +265,8 @@ def search_fields(search_term, search_space, scorer='partial', cutoff=80, max_re
     return filtered_results
 
 
-def find_aliases(match_space, search_space, stop_words=[],
-                 scorers=['partial', 'token sort'], cutoff=70, max_results=5):
+def find_aliases(match_space, search_space, stop_words=None,
+                 scorers=None, cutoff=70, max_results=5):
     """
     Creates a dictionary between entries of one list and the analogs of another
     through consecutive string matches
@@ -295,6 +295,10 @@ def find_aliases(match_space, search_space, stop_words=[],
         List of words from the match_space with no matches
 
     """
+    if stop_words is None:
+        stop_words = []
+    if scorers is None:
+        scorers = ['partial', 'token sort']
     match_set = set(match_space)
     search_set = set(search_space)
     intersection = match_set & search_set
@@ -351,17 +355,6 @@ def load_population_data():
                     'country': set(world['Confirmed'].groupby('Country/Region').max().index.values),
                     }
 
-    pop_keys = {'county': set(populations_counties[~populations_counties
-                              .duplicated(['STNAME', 'CTYNAME'])
-                              ]
-                              .groupby(['CTYNAME', 'STNAME'])
-                              .max()
-                              .index
-                              ),
-                'state': set(populations_states.groupby('STNAME').max().index),
-                'country': set(populations_countries.country.unique())
-                }
-
     # Preparing initial nation, state and county dataframes
     df_countries = populations_countries.applymap(convert2num)[['country', 'Population']]
     df_countries.rename(columns={'country': 'Country/Region'}, inplace=True)
@@ -403,7 +396,6 @@ def load_population_data():
     inNYstate = populations_counties.STNAME == 'New York'
     same_counties = populations_counties.CTYNAME.isin(boroughs)
     inNYC = same_counties & inNYstate
-    NYC_pop = populations_counties[inNYC].loc[:, ('CTYNAME', 'POPESTIMATE2019')]
     NYC_2019est = populations_counties[inNYC].loc[:, 'POPESTIMATE2019'].sum()
     df_NYC = pd.DataFrame({'CTYNAME': 'New York City', 'STNAME': 'New York',
                            'POPESTIMATE2019': NYC_2019est}, index=[0])

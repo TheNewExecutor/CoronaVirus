@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import re
-import plotly.express as px
 from fuzzywuzzy import fuzz, process
 from collections import defaultdict
 
@@ -34,19 +31,6 @@ def search_country(data, countries):
     """Narrow search results for confirmed, deaths"""
     sub_data = data[data['Country/Region'].isin(countries)]
     return sub_data
-
-
-def time_series(data):
-    """Transpose data with time series index, and swaps index and columns"""
-    idx = pd.to_datetime(data.columns, errors='coerce')
-    ts = (data
-          .T
-          .loc[data.columns.drop(labels=['Province/State', 'Country/Region', 'Lat', 'Long'],
-                                 errors='ignore')
-          ]
-          .set_index(idx)
-          )
-    return ts
 
 
 def load_merged_daily_global(datadict):
@@ -342,7 +326,7 @@ def find_aliases(match_space, search_space, stop_words=[],
 
 
 def translate(text, d):
-    """Translate text to alias if present in dicitonary"""
+    """Translate text to alias if present in dictionary"""
     try:
         return d[text]
     except:
